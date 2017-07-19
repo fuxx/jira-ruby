@@ -42,7 +42,6 @@ describe JIRA::Resource::Agile do
         expect(issue.class).to eq(JIRA::Resource::Issue)
         expect(issue.expanded?).to be_falsey
       end
-
     end
 
     it 'should query correct url with parameters' do
@@ -60,7 +59,78 @@ describe JIRA::Resource::Agile do
         expect(issue.class).to eq(JIRA::Resource::Issue)
         expect(issue.expanded?).to be_falsey
       end
+    end
 
+    context 'pagination' do
+      it 'should allow to query less issues' do
+        body = {
+          "expand": "schema,names",
+          "startAt": 0,
+          "maxResults": 1000,
+          "total": 9,
+          "issues": [
+            {
+              "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+              "id": "10546",
+              "self": "https://jira.example.com/rest/agile/1.0/issue/10546",
+              "key": "SBT-1"
+            },
+            {
+              "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+              "id": "10547",
+              "self": "https://jira.example.com/rest/agile/1.0/issue/10547",
+              "key": "SBT-2"
+            },
+            {
+              "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+              "id": "10556",
+              "self": "https://jira.example.com/rest/agile/1.0/issue/10556",
+              "key": "SBT-11"
+            }
+          ]
+        }.to_json
+
+        expect(client).to receive(:get).with('/jira/rest/agile/1.0/board/1/issue?maxResults=3').and_return(response)
+        expect(response).to receive(:body).and_return(body)
+
+        expect(client).to receive(:get).with('/jira/rest/api/2/search?jql=id+IN%2810546%2C+10547%2C+10556%29&maxResults=3').and_return(response)
+        expect(response).to receive(:body).and_return(body)
+
+        issues = JIRA::Resource::Agile.get_board_issues(client, 1, maxResults: 3)
+        expect(issues).to be_an(Array)
+        expect(issues.size).to eql(3)
+      end
+
+      it 'should allow to query more issues' do
+        nb_of_issues_to_test = 10
+
+        body = {
+          "expand": "schema,names",
+          "startAt": 0,
+          "maxResults": 1000,
+          "total": 9,
+          "issues":
+          nb_of_issues_to_test.times.map do |i|
+            {
+              "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+              "id": (10000 + i).to_s,
+              "self": "https://jira.example.com/rest/agile/1.0/issue/#{(10000 + i)}",
+              "key": "SBT-#{i}"
+            }
+          end
+        }.to_json
+
+        expect(client).to receive(:get).with("/jira/rest/agile/1.0/board/1/issue?maxResults=#{nb_of_issues_to_test}").and_return(response)
+        expect(response).to receive(:body).and_return(body)
+
+        issue_ids = nb_of_issues_to_test.times.map { |i| 10000 + i }.join('%2C+')
+        expect(client).to receive(:get).with("/jira/rest/api/2/search?jql=id+IN%28#{issue_ids}%29&maxResults=#{nb_of_issues_to_test}").and_return(response)
+        expect(response).to receive(:body).and_return(body)
+
+        issues = JIRA::Resource::Agile.get_board_issues(client, 1, maxResults: nb_of_issues_to_test)
+        expect(issues).to be_an(Array)
+        expect(issues.size).to eql(nb_of_issues_to_test)
+      end
     end
   end
 

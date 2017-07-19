@@ -26,7 +26,7 @@ module JIRA
         issue_ids = json['issues'].map { |issue|
           issue['id']
         }
-        client.Issue.jql("id IN(#{issue_ids.join(', ')})")
+        client.Issue.jql("id IN(#{issue_ids.join(', ')})", max_results: options[:maxResults])
       end
 
       def self.get_sprints(client, board_id, options = {})
